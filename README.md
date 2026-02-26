@@ -262,6 +262,90 @@ A card is flagged as high EV when:
 
 ---
 
+## Deploy to the Cloud (Railway)
+
+The easiest way to run this 24/7 without keeping your computer on. Railway gives you a free tier that's more than enough.
+
+### Step 1: Create a Railway account
+
+1. Go to [railway.app](https://railway.app/) and sign up with GitHub
+2. You get $5 of free usage per month — this tracker uses about $1-2/month
+
+### Step 2: Create a new project
+
+1. Click **New Project** on your Railway dashboard
+2. Select **Deploy from GitHub Repo**
+3. Find and select `venetisgr/pokemon_higher_ev`
+4. Railway will detect the `Dockerfile` automatically
+
+### Step 3: Add environment variables
+
+1. In your Railway project, click on the deployed service
+2. Go to the **Variables** tab
+3. Add each of these (click **+ New Variable** for each):
+
+```
+DISCORD_WEBHOOK_URL = https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN
+OPENSEA_API_KEY     = your_opensea_key
+POLYGON_RPC_URL     = https://polygon-mainnet.g.alchemy.com/v2/your_key
+MIN_EV_RATIO        = 2.0
+MAX_EV_RATIO        = 10.0
+SCAN_INTERVAL_SECONDS = 300
+```
+
+4. Railway will automatically redeploy with the new variables
+
+### Step 4: Verify it's running
+
+1. Go to the **Deployments** tab — you should see a green "Active" deployment
+2. Click **View Logs** to see the scanner output in real-time
+3. You should see messages like:
+   ```
+   Fetching Courtyard listings...
+   Found 87 listings
+   Evaluating market prices...
+   Next scan in 300s...
+   ```
+4. Check your Discord channel — alerts will appear there when opportunities are found
+
+### That's it
+
+Railway runs `pokemon-ev watch` continuously via the Dockerfile. It will:
+- Restart automatically if it crashes (up to 3 retries)
+- Keep running 24/7
+- Send Discord alerts whenever a 2x+ EV card is found
+
+### Managing your deployment
+
+- **View logs:** Railway dashboard > your service > Deployments > View Logs
+- **Restart:** Railway dashboard > your service > Deployments > Restart
+- **Stop:** Railway dashboard > your service > Settings > Remove Service
+- **Update:** Just push to GitHub — Railway auto-deploys on every push
+
+### Alternative: Docker (any server)
+
+If you have your own server or VPS, you can run the Docker container directly:
+
+```bash
+# Build
+docker build -t pokemon-ev .
+
+# Run (pass env vars)
+docker run -d --name pokemon-ev \
+  -e DISCORD_WEBHOOK_URL="your_webhook_url" \
+  -e OPENSEA_API_KEY="your_key" \
+  -e POLYGON_RPC_URL="https://polygon-rpc.com" \
+  pokemon-ev
+
+# Check logs
+docker logs -f pokemon-ev
+
+# Stop
+docker stop pokemon-ev
+```
+
+---
+
 ## Troubleshooting
 
 ### `pokemon-ev: command not found`
