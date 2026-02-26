@@ -127,22 +127,28 @@ async def estimate_market_price(
     if not sales:
         return None
 
+    # Collect unique token symbols to batch-fetch prices
+    from src.scrapers.coingecko import get_multiple_prices
+
+    symbols_needed = set()
+    for sale in sales:
+        payment = sale.get("payment", {})
+        symbol = payment.get("symbol", "USDC")
+        symbols_needed.add(symbol.upper())
+
+    crypto_prices = await get_multiple_prices(list(symbols_needed))
+
     prices = []
     for sale in sales:
         payment = sale.get("payment", {})
         quantity = float(payment.get("quantity", 0))
         decimals = int(payment.get("decimals", 18))
         if quantity > 0:
-            price_usd = quantity / (10**decimals)
-            # OpenSea prices in ETH/MATIC — approximate USD conversion
-            symbol = payment.get("symbol", "USDC")
-            if symbol in ("USDC", "USDT", "DAI"):
-                prices.append(price_usd)
-            elif symbol in ("ETH", "WETH"):
-                # Rough ETH price — in production, use a price oracle
-                prices.append(price_usd * 2500)
-            elif symbol in ("MATIC", "POL"):
-                prices.append(price_usd * 0.50)
+            token_amount = quantity / (10**decimals)
+            symbol = payment.get("symbol", "USDC").upper()
+            usd_rate = crypto_prices.get(symbol, 0.0)
+            if usd_rate > 0:
+                prices.append(token_amount * usd_rate)
 
     if not prices:
         return None

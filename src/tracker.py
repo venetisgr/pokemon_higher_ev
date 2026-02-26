@@ -7,12 +7,19 @@ from rich.console import Console
 from rich.table import Table
 
 from src.alerts.discord import send_alert, send_batch_alert
-from src.analysis.ev_calculator import evaluate_listing, filter_opportunities, rank_opportunities
+from src.analysis.ev_calculator import (
+    aggregate_market_prices,
+    evaluate_listing,
+    filter_opportunities,
+    rank_opportunities,
+)
 from src.config import settings
 from src.db.store import Database
-from src.models import EVOpportunity
+from src.models import EVOpportunity, MarketPrice
 from src.scrapers.courtyard import get_listings
 from src.scrapers.opensea import estimate_market_price
+from src.scrapers.tcgplayer import search_card_price as tcg_search
+from src.scrapers.pricecharting import search_card_price as pc_search
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -47,20 +54,34 @@ async def scan_once(db: Database) -> list[EVOpportunity]:
         if db.was_recently_alerted(listing.token_id, hours=24):
             continue
 
-        # Get market price estimate
-        market_price = await estimate_market_price(
-            card_name=listing.name,
-            grade=listing.grade,
-            token_id=listing.token_id,
+        # Fetch prices from all sources concurrently
+        source_prices: list[MarketPrice] = []
+
+        opensea_price, tcg_price, pc_price = await asyncio.gather(
+            estimate_market_price(
+                card_name=listing.name,
+                grade=listing.grade,
+                token_id=listing.token_id,
+            ),
+            tcg_search(card_name=listing.name, grade=listing.grade),
+            pc_search(card_name=listing.name, grade=listing.grade),
+            return_exceptions=True,
         )
 
+        for price in (opensea_price, tcg_price, pc_price):
+            if isinstance(price, MarketPrice):
+                source_prices.append(price)
+                db.save_market_price(price)
+
+        # Aggregate into a single best estimate
+        market_price = aggregate_market_prices(source_prices)
         if not market_price:
             continue
 
-        db.save_market_price(market_price)
+        num_sources = len(source_prices)
 
         # Evaluate
-        opportunity = evaluate_listing(listing, market_price)
+        opportunity = evaluate_listing(listing, market_price, num_sources=num_sources)
         if opportunity:
             opportunities.append(opportunity)
 
@@ -98,6 +119,7 @@ def _print_opportunities_table(opportunities: list[EVOpportunity]):
     table.add_column("EV", justify="right", style="bold yellow")
     table.add_column("Profit", justify="right", style="bold green")
     table.add_column("Conf", justify="right")
+    table.add_column("Source", style="dim")
 
     for opp in opportunities[:20]:
         table.add_row(
@@ -108,6 +130,7 @@ def _print_opportunities_table(opportunities: list[EVOpportunity]):
             opp.ev_multiplier_str,
             opp.profit_str,
             f"{opp.confidence * 100:.0f}%",
+            opp.market_price.source.value,
         )
 
     console.print(table)

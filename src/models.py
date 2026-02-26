@@ -32,6 +32,8 @@ class DataSource(Enum):
     COURTYARD = "courtyard"
     OPENSEA = "opensea"
     POLYGON = "polygon"
+    TCGPLAYER = "tcgplayer"
+    PRICECHARTING = "pricecharting"
 
 
 @dataclass
