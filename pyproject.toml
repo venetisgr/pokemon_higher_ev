@@ -1,0 +1,30 @@
+[project]
+name = "pokemon-ev-tracker"
+version = "0.1.0"
+description = "Track Pokemon cards on Courtyard.io with high expected value (2-3x market opportunities)"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27",
+    "beautifulsoup4>=4.12",
+    "web3>=7.0",
+    "discord-webhook>=1.3",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "rich>=13.0",
+    "click>=8.1",
+    "apscheduler>=3.10",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+pokemon-ev = "src.cli:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
